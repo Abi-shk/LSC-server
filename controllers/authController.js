@@ -143,8 +143,10 @@ export const googleAuth = async (req, res) => {
   catch (err) {
     res.status(400).json({ message: "Error verifying Google Id", err });
   }
+
+
   if (!userData) {
-    res.status(400).json({ message: "Something Went Wrong" });
+    res.status(400).json({ message: "Couldn't authorize with google" });
   }
 
   const { given_name, family_name, email } = userData;
@@ -153,7 +155,6 @@ export const googleAuth = async (req, res) => {
     const userExist = await Users.findOne({ email, google: true, password: process.env.GOOGLE_USER_PASSWORD });
 
     if (userExist) {
-      userExist.password = undefined;
       const token = createJWT(userExist?._id);
       let response
       try {
@@ -164,7 +165,7 @@ export const googleAuth = async (req, res) => {
         );
       } catch (e) {
         console.log(e)
-        throw new Error("Failed to create chat account");
+        return res.status(500).json({ message: "Failed to create chat account", e })
       }
       return res.status(200).json({
         success: true,
@@ -176,7 +177,7 @@ export const googleAuth = async (req, res) => {
     } else {
       const existingUser = await Users.findOne({ email })
       if (existingUser) {
-        return res.status(500).json({ message: "An account already exists with this email" })
+        return res.status(500).json({ message: "An account already exists with this email, try login in with email and password" })
       } else {
         const newUser = new Users({
           firstName: given_name,
@@ -199,7 +200,8 @@ export const googleAuth = async (req, res) => {
           );
         } catch (e) {
           console.log(e)
-          throw new Error("Failed to create chat account");
+          return res.status(500).json({ message: "Failed to create chat account", e })
+
         }
 
         return res.status(200).json({
