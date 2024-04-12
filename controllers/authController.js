@@ -36,7 +36,7 @@ export const register = async (req, res, next) => {
       email,
       password: hashedPassword,
       verified: false,
-      google:false
+      google: false
     });
 
     //send email verification to user
@@ -70,7 +70,7 @@ export const login = async (req, res, next) => {
     if (!user) {
       console.log("errorrrrrrrrrrrrrrr")
       next("Invalid email or password");
-      
+
       return;
     }
 
@@ -173,40 +173,45 @@ export const googleAuth = async (req, res) => {
         token,
         chat: response.data,
       });
-    }else{
-      return res.status(500).json({ message: "An account already exists with this email"})
-    }
-    const newUser = new Users({
-      firstName: given_name,
-      lastName: family_name,
-      email,
-      password: process.env.GOOGLE_USER_PASSWORD,
-      verified: true,
-      google: true
-    })
-    await newUser.save();
-    newUser.password = undefined;
-    const token = createJWT(newUser?._id);
+    } else {
+      const existingUser = await Users.findOne({ email })
+      if (existingUser) {
+        return res.status(500).json({ message: "An account already exists with this email" })
+      } else {
+        const newUser = new Users({
+          firstName: given_name,
+          lastName: family_name,
+          email,
+          password: process.env.GOOGLE_USER_PASSWORD,
+          verified: true,
+          google: true
+        })
+        await newUser.save();
+        newUser.password = undefined;
+        const token = createJWT(newUser?._id);
 
-    let response
-    try {
-      response = await axios.put(
-        "https://api.chatengine.io/users/",
-        { username: `${newUser.firstName} ${newUser.lastName}`, secret: email, email: email },
-        { headers: { "Private-Key": process.env.CHAT_ENGINE_PRIVATE_KEY } }
-      );
-    } catch (e) {
-      console.log(e)
-      throw new Error("Failed to create chat account");
+        let response
+        try {
+          response = await axios.put(
+            "https://api.chatengine.io/users/",
+            { username: `${newUser.firstName} ${newUser.lastName}`, secret: email, email: email },
+            { headers: { "Private-Key": process.env.CHAT_ENGINE_PRIVATE_KEY } }
+          );
+        } catch (e) {
+          console.log(e)
+          throw new Error("Failed to create chat account");
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: "Login successfully",
+          user: newUser,
+          token,
+          chat: response.data,
+        })
+      }
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Login successfully",
-      user: newUser,
-      token,
-      chat: response.data,
-    })
   }
   catch (err) {
     console.log(err)
